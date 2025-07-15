@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -24,15 +25,20 @@ func main() {
 		return
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		go publishToQueue(js, "!!!!!")
+	http.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+		go publishToQueue(js, body)
 		w.WriteHeader(http.StatusNoContent)
 	})
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":3000", nil)
 }
 
-func publishToQueue(js jetstream.JetStream, msg string) error {
-	_, err := js.PublishAsync("PAYMENT.created", []byte(msg))
+func publishToQueue(js jetstream.JetStream, body []byte) error {
+	_, err := js.PublishAsync("PAYMENT.created", body)
 	if err != nil {
 		log.Printf("Failed to publish: %v", err)
 		return err
