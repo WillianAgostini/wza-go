@@ -33,18 +33,16 @@ var fallbackPayment = PaymentConfig{
 }
 
 type Data struct {
-	CorrelationId string    `json:"correlationId"`
+	CorrelationId string    `json:"correlationid"`
 	Amount        float64   `json:"amount"`
-	RequestedAt   time.Time `json:"requestedAt"`
+	RequestedAt   time.Time `json:"requestedat"`
 }
 
 const (
-	numConsumers = 1
+	numConsumers = 25
 )
 
 func main() {
-	client, _ := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
-	collection := client.Database("testing").Collection("numbers")
 	defaultPayment.cb = gobreaker.NewCircuitBreaker[Data](gobreaker.Settings{
 		Name:    "Default",
 		Timeout: 1 * time.Millisecond,
@@ -67,19 +65,24 @@ func main() {
 		return
 	}
 
+	client, _ := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
+	database := client.Database("rinha")
+	defaultCollection := database.Collection("default")
+	fallbackCollection := database.Collection("fallback")
+
 	var wg sync.WaitGroup
 	for i := range numConsumers {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			consumerWorker(i, js, collection)
+			consumerWorker(i, js, defaultCollection, fallbackCollection)
 		}(i)
 	}
 
 	wg.Wait()
 }
 
-func consumerWorker(i int, js jetstream.JetStream, collection *mongo.Collection) {
+func consumerWorker(i int, js jetstream.JetStream, defaultCollection *mongo.Collection, fallbackCollection *mongo.Collection) {
 	log.Printf("Starting consumer %d", i)
 
 	cons, err := js.CreateOrUpdateConsumer(context.Background(), "PAYMENT", jetstream.ConsumerConfig{
@@ -104,18 +107,25 @@ func consumerWorker(i int, js jetstream.JetStream, collection *mongo.Collection)
 		payload := Data{}
 		json.Unmarshal(msg.Data(), &payload)
 
-		data, err := req(payload, msg)
+		data, direction, err := req(payload)
 		if err != nil {
 			log.Printf("Failed to process message: %v", err)
 			msg.NakWithDelay(time.Second * 1)
 			return
 		}
-		result, err := collection.InsertOne(context.TODO(), data)
-		if err != nil {
-			log.Fatalf("Failed to insert data: %v", err)
+		if direction == "default" {
+			_, err := defaultCollection.InsertOne(context.TODO(), data)
+			if err != nil {
+				log.Fatalf("Failed to insert data: %v", err)
+			}
+
+		} else {
+			_, err := fallbackCollection.InsertOne(context.TODO(), data)
+			if err != nil {
+				log.Fatalf("Failed to insert data: %v", err)
+			}
 		}
 
-		log.Printf("Inserted document with _id: %v\n", result.InsertedID)
 		log.Printf("Message processed successfully: %s", msg.Subject())
 		msg.Ack()
 	})
@@ -130,15 +140,18 @@ func consumerWorker(i int, js jetstream.JetStream, collection *mongo.Collection)
 	select {}
 }
 
-func req(data Data, msg jetstream.Msg) (Data, error) {
-	if data, err := PostRequest(defaultPayment, data); err != nil {
-		log.Printf("Failed to post request: %v", err)
-		if _, err := PostRequest(fallbackPayment, data); err != nil {
+func req(payload Data) (Data, string, error) {
+	data, err := PostRequest(payload, defaultPayment)
+	if err != nil {
+		log.Printf("Failed to post request to default: %v", err)
+		data, err = PostRequest(payload, fallbackPayment)
+		if err != nil {
 			log.Printf("Failed to post request to fallback: %v", err)
-			return Data{}, err
+			return Data{}, "", err
 		}
+		return data, "fallback", nil
 	}
-	return data, nil
+	return data, "default", nil
 }
 
 func SetupPaymentStream(nc *nats.Conn) error {
@@ -179,7 +192,7 @@ func setupBroker(nc *nats.Conn) jetstream.JetStream {
 	return js
 }
 
-func PostRequest(config PaymentConfig, payload Data) (Data, error) {
+func PostRequest(payload Data, config PaymentConfig) (Data, error) {
 	data, err := config.cb.Execute(func() (Data, error) {
 		return request(config, payload)
 	})
