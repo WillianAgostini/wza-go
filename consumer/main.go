@@ -23,12 +23,12 @@ type PaymentConfig struct {
 }
 
 var defaultPayment = PaymentConfig{
-	url: "http://localhost:4000/payments",
+	url: "http://localhost:8001/payments",
 	cb:  nil,
 }
 
 var fallbackPayment = PaymentConfig{
-	url: "http://localhost:4001/payments",
+	url: "http://localhost:8002/payments",
 	cb:  nil,
 }
 
@@ -126,7 +126,7 @@ func consumerWorker(i int, js jetstream.JetStream, defaultCollection *mongo.Coll
 			}
 		}
 
-		log.Printf("Message processed successfully: %s", msg.Subject())
+		log.Printf("Message processed successfully")
 		msg.Ack()
 	})
 

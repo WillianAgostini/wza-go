@@ -35,6 +35,17 @@ func main() {
 		return
 	}
 
+	client, _ := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
+	database := client.Database("rinha")
+	defaultCollection := database.Collection("default")
+	fallbackCollection := database.Collection("fallback")
+
+	http.HandleFunc("/purge-payments", func(w http.ResponseWriter, r *http.Request) {
+		defaultCollection.Drop(context.Background())
+		fallbackCollection.Drop(context.Background())
+		w.WriteHeader(http.StatusOK)
+	})
+
 	http.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -46,11 +57,6 @@ func main() {
 	})
 
 	// Create this endpoint GET /payments-summary?from=2020-07-10T12:34:56.000Z&to=2020-07-10T12:35:56.000Z
-
-	client, _ := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
-	database := client.Database("rinha")
-	defaultCollection := database.Collection("default")
-	fallbackCollection := database.Collection("fallback")
 
 	http.HandleFunc("/payments-summary", func(w http.ResponseWriter, r *http.Request) {
 		from := r.URL.Query().Get("from")
@@ -132,7 +138,7 @@ func main() {
 		json.NewEncoder(w).Encode(result)
 	})
 
-	http.ListenAndServe(":3000", nil)
+	http.ListenAndServe(":9999", nil)
 }
 
 func publishToQueue(js jetstream.JetStream, body []byte) error {
