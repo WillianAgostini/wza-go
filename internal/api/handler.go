@@ -43,12 +43,9 @@ func handlePostPayments(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	err = broker.Publish(payment)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		return
-	}
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
+
+	go broker.Publish(payment)
 }
 
 func handleGetPaymentsSummary(ctx *fasthttp.RequestCtx) {

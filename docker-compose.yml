@@ -5,8 +5,8 @@ x-app-base: &app-base
   environment:
     - DEFAULT_URL=http://payment-processor-default:8080
     - FALLBACK_URL=http://payment-processor-fallback:8080
-    - MAX_WORKERS=1
-    - MAX_ACK_PENDING=100
+    - MAX_WORKERS=5
+    - MAX_ACK_PENDING=10
     - BROKER_URL=nats://nats:4222
   networks:
     - backend

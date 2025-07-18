@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 	"wza/internal/config"
 	"wza/internal/entity"
 
@@ -81,7 +82,7 @@ func Publish(payment *entity.PaymentRequest) error {
 }
 
 func Subscribe(handler func(entity.PaymentRequest) error) {
-	maxAckPending, _ := strconv.Atoi(config.GetEnv("MAX_ACK_PENDING", "100"))
+	maxAckPending, _ := strconv.Atoi(config.GetEnv("MAX_ACK_PENDING", "50"))
 	cons, err := js.CreateOrUpdateConsumer(context.Background(), "PAYMENT", jetstream.ConsumerConfig{
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		FilterSubject: "PAYMENT.*",
@@ -107,7 +108,7 @@ func Subscribe(handler func(entity.PaymentRequest) error) {
 			}
 			if err := handler(payload); err != nil {
 				log.Printf("Handler error: %v", err)
-				// msg.NakWithDelay(time.Millisecond)
+				msg.NakWithDelay(500 * time.Millisecond)
 				msg.Nak()
 				return
 			}

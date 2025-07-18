@@ -35,18 +35,18 @@ func consumerWorker(i int) {
 	log.Printf("Starting consumer %d", i)
 
 	broker.Subscribe(func(payment entity.PaymentRequest) error {
+		entity.SetRequestedAt(&payment)
 		response, err := request.PostDefault(&payment)
-
 		if err != nil {
+			entity.SetRequestedAt(&payment)
 			response, err = request.PostFallback(&payment)
 			if err != nil {
 				return errors.New("can not process")
 			}
 			repository.InsertFallback(response)
-			return nil
+		} else {
+			repository.InsertDefault(response)
 		}
-
-		repository.InsertDefault(response)
 		return nil
 	})
 

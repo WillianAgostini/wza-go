@@ -28,7 +28,7 @@ func Init() {
 		Timeout: 1 * time.Millisecond,
 	})
 	defaultConfig.client = http.Client{
-		Timeout: 1 * time.Second,
+		Timeout: 500 * time.Millisecond,
 	}
 
 	fallbackConfig.url = config.GetEnv("FALLBACK_URL", "http://localhost:8002/payments")
@@ -36,14 +36,13 @@ func Init() {
 		Name:    "Fallback",
 		Timeout: 1 * time.Millisecond,
 	})
-	defaultConfig.client = http.Client{
-		Timeout: 5 * time.Second,
+	fallbackConfig.client = http.Client{
+		Timeout: 2 * time.Second,
 	}
 }
 
 func post(payment *entity.PaymentRequest, config paymentConfig) (*entity.PaymentRequest, error) {
-	data, err := config.cb.Execute(func() (*entity.PaymentRequest, error) {
-		entity.SetRequestedAt(payment)
+	return config.cb.Execute(func() (*entity.PaymentRequest, error) {
 		payload, _ := json.Marshal(payment)
 		_, err := config.client.Post(config.url, "application/json", bytes.NewBuffer(payload))
 		if err != nil {
@@ -52,11 +51,6 @@ func post(payment *entity.PaymentRequest, config paymentConfig) (*entity.Payment
 
 		return payment, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 func PostDefault(payment *entity.PaymentRequest) (*entity.PaymentRequest, error) {
