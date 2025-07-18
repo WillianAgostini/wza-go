@@ -38,11 +38,13 @@ services:
 
   app1:
     <<: *app-base
+    hostname: api1
     depends_on:
       - nats
 
   app2:
     <<: *app-base
+    hostname: api2
     depends_on:
       - nats
 

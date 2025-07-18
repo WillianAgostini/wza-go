@@ -2,55 +2,31 @@ package api
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 	"wza/internal/broker"
 	"wza/internal/entity"
 	"wza/internal/repository"
-
-	"github.com/valyala/fasthttp"
 )
 
-func HandleRequest(ctx *fasthttp.RequestCtx) {
-	switch string(ctx.Path()) {
-	case "/payments":
-		if ctx.IsPost() {
-			handlePostPayments(ctx)
-			return
-		}
-	case "/payments-summary":
-		if ctx.IsGet() {
-			handleGetPaymentsSummary(ctx)
-			return
-		}
-	case "/purge-payments":
-		if ctx.IsPost() {
-			handlePurgePayments(ctx)
-			return
-		}
-	}
+func HandlePostPayments(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
 
-	ctx.SetStatusCode(fasthttp.StatusNotFound)
-	ctx.SetBodyString("404 - Not Found")
-}
-
-func handlePostPayments(ctx *fasthttp.RequestCtx) {
-	body := ctx.PostBody()
 	payment, err := entity.ParsePayment(body)
 
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
-		ctx.SetBodyString(err.Error())
+		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-
-	ctx.SetStatusCode(fasthttp.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 
 	go broker.Publish(payment)
 }
 
-func handleGetPaymentsSummary(ctx *fasthttp.RequestCtx) {
-	fromStr := string(ctx.QueryArgs().Peek("from"))
-	toStr := string(ctx.QueryArgs().Peek("to"))
+func HandleGetPaymentsSummary(w http.ResponseWriter, r *http.Request) {
+	fromStr := r.URL.Query().Get("from")
+	toStr := r.URL.Query().Get("to")
 
 	var from, to *time.Time
 
@@ -73,12 +49,13 @@ func handleGetPaymentsSummary(ctx *fasthttp.RequestCtx) {
 		defaultCount, defaultTotalAmount, fallbackCount, fallbackTotalAmount,
 	)
 
-	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetContentType("application/json")
-	ctx.SetBodyString(body)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(body))
+
 }
 
-func handlePurgePayments(ctx *fasthttp.RequestCtx) {
+func HandlePurgePayments(w http.ResponseWriter, r *http.Request) {
 	repository.PurgeAllData()
-	ctx.SetStatusCode(fasthttp.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
