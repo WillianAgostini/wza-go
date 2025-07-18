@@ -5,43 +5,47 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+	"wza/internal/config"
 	"wza/internal/entity"
 
 	"github.com/sony/gobreaker/v2"
 )
 
 type paymentConfig struct {
-	url string
-	cb  *gobreaker.CircuitBreaker[*entity.PaymentRequest]
+	url    string
+	cb     *gobreaker.CircuitBreaker[*entity.PaymentRequest]
+	client http.Client
 }
 
-var defaultConfig = paymentConfig{
-	url: "http://localhost:8001/payments",
-	cb:  nil,
-}
+var defaultConfig = paymentConfig{}
 
-var fallbackConfig = paymentConfig{
-	url: "http://localhost:8002/payments",
-	cb:  nil,
-}
+var fallbackConfig = paymentConfig{}
 
 func Init() {
+	defaultConfig.url = config.GetEnv("DEFAULT_URL", "http://localhost:8001/payments")
 	defaultConfig.cb = gobreaker.NewCircuitBreaker[*entity.PaymentRequest](gobreaker.Settings{
 		Name:    "Default",
 		Timeout: 1 * time.Millisecond,
 	})
+	defaultConfig.client = http.Client{
+		Timeout: 1 * time.Second,
+	}
 
+	fallbackConfig.url = config.GetEnv("FALLBACK_URL", "http://localhost:8002/payments")
 	fallbackConfig.cb = gobreaker.NewCircuitBreaker[*entity.PaymentRequest](gobreaker.Settings{
 		Name:    "Fallback",
 		Timeout: 1 * time.Millisecond,
 	})
+	defaultConfig.client = http.Client{
+		Timeout: 5 * time.Second,
+	}
 }
 
-func post(client *http.Client, payment *entity.PaymentRequest, config paymentConfig) (*entity.PaymentRequest, error) {
+func post(payment *entity.PaymentRequest, config paymentConfig) (*entity.PaymentRequest, error) {
 	data, err := config.cb.Execute(func() (*entity.PaymentRequest, error) {
 		entity.SetRequestedAt(payment)
 		payload, _ := json.Marshal(payment)
-		_, err := client.Post(config.url, "application/json", bytes.NewBuffer(payload))
+		_, err := config.client.Post(config.url, "application/json", bytes.NewBuffer(payload))
 		if err != nil {
 			return nil, err
 		}
@@ -56,15 +60,9 @@ func post(client *http.Client, payment *entity.PaymentRequest, config paymentCon
 }
 
 func PostDefault(payment *entity.PaymentRequest) (*entity.PaymentRequest, error) {
-	client := &http.Client{
-		Timeout: 1 * time.Second,
-	}
-	return post(client, payment, defaultConfig)
+	return post(payment, defaultConfig)
 }
 
 func PostFallback(payment *entity.PaymentRequest) (*entity.PaymentRequest, error) {
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	return post(client, payment, fallbackConfig)
+	return post(payment, fallbackConfig)
 }

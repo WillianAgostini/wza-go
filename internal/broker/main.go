@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
+	"wza/internal/config"
 	"wza/internal/entity"
 
 	"github.com/nats-io/nats.go"
@@ -15,7 +17,8 @@ var js jetstream.JetStream
 var nc nats.Conn
 
 func Init() {
-	nc, err := nats.Connect(nats.DefaultURL)
+	url := config.GetEnv("BROKER_URL", nats.DefaultURL)
+	nc, err := nats.Connect(url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -74,16 +77,16 @@ func Publish(payment *entity.PaymentRequest) error {
 		log.Printf("Failed to publish: %v", err)
 		return err
 	}
-	log.Println("Published message to PAYMENT.created")
 	return nil
 }
 
 func Subscribe(handler func(entity.PaymentRequest) error) {
+	maxAckPending, _ := strconv.Atoi(config.GetEnv("MAX_ACK_PENDING", "100"))
 	cons, err := js.CreateOrUpdateConsumer(context.Background(), "PAYMENT", jetstream.ConsumerConfig{
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		FilterSubject: "PAYMENT.*",
 		Durable:       "worker-group",
-		MaxAckPending: 100,
+		MaxAckPending: maxAckPending,
 	})
 	if err != nil {
 		log.Printf("Failed to create consumer: %v", err)
@@ -108,7 +111,6 @@ func Subscribe(handler func(entity.PaymentRequest) error) {
 				msg.Nak()
 				return
 			}
-			log.Printf("Message processed successfully")
 			msg.Ack()
 		}(msg)
 	})
