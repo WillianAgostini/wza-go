@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"strconv"
-	"sync"
 	"wza/internal/broker"
 	"wza/internal/config"
 	"wza/internal/entity"
@@ -12,23 +11,17 @@ import (
 	"wza/internal/request"
 )
 
-var numConsumers = 1
-
 func Init() {
 	request.Init()
 
 	numConsumers, _ := strconv.Atoi(config.GetEnv("MAX_WORKERS", "1"))
-
-	var wg sync.WaitGroup
-	for i := range numConsumers {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			consumerWorker(i)
-		}(i)
+	if numConsumers < 1 {
+		numConsumers = 1
 	}
 
-	wg.Wait()
+	for i := 0; i < numConsumers; i++ {
+		go consumerWorker(i)
+	}
 }
 
 func consumerWorker(i int) {
