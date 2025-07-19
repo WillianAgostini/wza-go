@@ -41,14 +41,16 @@ func HandleGetPaymentsSummary(w http.ResponseWriter, r *http.Request) {
 	fromStr := r.URL.Query().Get("from")
 	toStr := r.URL.Query().Get("to")
 
-	from := time.Time{}
+	now := time.Now()
+	from := now
+	to := now
+
 	if fromStr != "" {
 		if t, err := time.Parse(time.RFC3339Nano, fromStr); err == nil {
 			from = t
 		}
 	}
 
-	to := time.Now()
 	if toStr != "" {
 		if t, err := time.Parse(time.RFC3339Nano, toStr); err == nil {
 			to = t
