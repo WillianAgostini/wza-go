@@ -42,7 +42,7 @@ func HandleGetPaymentsSummary(w http.ResponseWriter, r *http.Request) {
 	toStr := r.URL.Query().Get("to")
 
 	now := time.Now()
-	from := now
+	from := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := now
 
 	if fromStr != "" {
