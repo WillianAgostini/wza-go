@@ -41,21 +41,22 @@ func HandleGetPaymentsSummary(w http.ResponseWriter, r *http.Request) {
 	fromStr := r.URL.Query().Get("from")
 	toStr := r.URL.Query().Get("to")
 
-	var from, to *time.Time
-
+	from := time.Time{}
 	if fromStr != "" {
 		if t, err := time.Parse(time.RFC3339Nano, fromStr); err == nil {
-			from = &t
-		}
-	}
-	if toStr != "" {
-		if t, err := time.Parse(time.RFC3339Nano, toStr); err == nil {
-			to = &t
+			from = t
 		}
 	}
 
-	defaultCount, defaultTotalAmount := repository.TotalByPeriodDefault(*from, *to)
-	fallbackCount, fallbackTotalAmount := repository.TotalByPeriodFallback(*from, *to)
+	to := time.Now()
+	if toStr != "" {
+		if t, err := time.Parse(time.RFC3339Nano, toStr); err == nil {
+			to = t
+		}
+	}
+
+	defaultCount, defaultTotalAmount := repository.TotalByPeriodDefault(from, to)
+	fallbackCount, fallbackTotalAmount := repository.TotalByPeriodFallback(from, to)
 
 	body := fmt.Sprintf(
 		`{"default":{"totalRequests":%d,"totalAmount":%.2f},"fallback":{"totalRequests":%d,"totalAmount":%.2f}}`,
