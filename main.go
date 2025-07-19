@@ -1,7 +1,12 @@
 package main
 
 import (
-	"net/http"
+	"log"
+	"runtime"
+
+	"github.com/fasthttp/router"
+	"github.com/valyala/fasthttp"
+
 	"wza/internal/api"
 	"wza/internal/broker"
 	"wza/internal/job"
@@ -9,6 +14,7 @@ import (
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	broker.Init()
 	repository.Init()
 	go job.Init()
@@ -16,8 +22,9 @@ func main() {
 }
 
 func HttpInit() {
-	http.HandleFunc("/payments", api.HandlePostPayments)
-	http.HandleFunc("/payments-summary", api.HandleGetPaymentsSummary)
-	http.HandleFunc("/purge-payments", api.HandlePurgePayments)
-	http.ListenAndServe(":9999", nil)
+	r := router.New()
+	r.POST("/payments", api.HandlePostPaymentsFast)
+	r.GET("/payments-summary", api.HandleGetPaymentsSummaryFast)
+	r.GET("/purge-payments", api.HandlePurgePaymentsFast)
+	log.Fatal(fasthttp.ListenAndServe(":9999", r.Handler))
 }
