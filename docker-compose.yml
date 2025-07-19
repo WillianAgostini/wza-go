@@ -25,7 +25,6 @@ services:
     command: ["-js"]
     ports:
       - "4222:4222"
-      - "8222:8222"
     networks:
       - backend
     volumes:
@@ -34,7 +33,7 @@ services:
       resources:
         limits:
           cpus: "0.20"
-          memory: "25MB"
+          memory: "50MB"
 
   app1:
     <<: *app-base
@@ -63,7 +62,7 @@ services:
       resources:
         limits:
           cpus: "0.20"
-          memory: "85MB"
+          memory: "60MB"
 
 networks:
   backend:
