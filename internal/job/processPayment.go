@@ -29,16 +29,16 @@ func consumerWorker(i int) {
 
 	broker.Subscribe(func(payment entity.PaymentRequest) error {
 		entity.SetRequestedAt(&payment)
-		response, err := request.PostDefault(&payment)
+		_, err := request.PostDefault(&payment)
 		if err != nil {
 			entity.SetRequestedAt(&payment)
-			response, err = request.PostFallback(&payment)
+			_, err = request.PostFallback(&payment)
 			if err != nil {
 				return errors.New("can not process")
 			}
-			repository.InsertFallback(response)
+			repository.InsertFallback(&payment)
 		} else {
-			repository.InsertDefault(response)
+			repository.InsertDefault(&payment)
 		}
 		return nil
 	})

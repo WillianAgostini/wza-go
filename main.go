@@ -25,6 +25,6 @@ func HttpInit() {
 	r := router.New()
 	r.POST("/payments", api.HandlePostPayments)
 	r.GET("/payments-summary", api.HandleGetPaymentsSummary)
-	r.GET("/purge-payments", api.HandlePurgePayments)
+	r.POST("/purge-payments", api.HandlePurgePayments)
 	log.Fatal(fasthttp.ListenAndServe(":9999", r.Handler))
 }
