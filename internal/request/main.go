@@ -44,7 +44,7 @@ func Init() {
 func post(payment *entity.PaymentRequest, config paymentConfig) (*entity.PaymentRequest, error) {
 	return config.cb.Execute(func() (*entity.PaymentRequest, error) {
 		payload, _ := json.Marshal(payment)
-		_, err := config.client.Post(config.url, "application/json", bytes.NewBuffer(payload))
+		_, err := config.client.Post(config.url+"/payments", "application/json", bytes.NewBuffer(payload))
 		if err != nil {
 			return nil, err
 		}

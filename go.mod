@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/fasthttp/router v1.5.4
 	github.com/nats-io/nats.go v1.43.0
+	github.com/redis/go-redis/v9 v9.7.0
 )
 
 require (
@@ -13,7 +14,6 @@ require (
 	github.com/go-redsync/redsync/v4 v4.13.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 )
@@ -21,7 +21,6 @@ require (
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/sony/gobreaker/v2 v2.1.0

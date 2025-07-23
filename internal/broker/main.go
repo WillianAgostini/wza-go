@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"time"
 	"wza/internal/config"
 	"wza/internal/entity"
 
@@ -108,7 +107,6 @@ func Subscribe(handler func(entity.PaymentRequest) error) {
 			}
 			if err := handler(payload); err != nil {
 				log.Printf("Handler error: %v", err)
-				msg.NakWithDelay(500 * time.Millisecond)
 				msg.Nak()
 				return
 			}

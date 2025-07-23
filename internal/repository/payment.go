@@ -1,85 +1,79 @@
 package repository
 
 import (
-	"database/sql"
-	"fmt"
+	"context"
+	"encoding/json"
 	"log"
-	"os"
-	"path/filepath"
+	"strconv"
 	"time"
+	"wza/internal/config"
 	"wza/internal/entity"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/redis/go-redis/v9"
 )
 
-var db *sql.DB
+var (
+	rdb *redis.Client
+	ctx = context.Background()
+)
 
 func Init() {
 	connect()
-	createTableIfNotExists("paymentsDefault")
-	createTableIfNotExists("paymentsFallback")
-	log.Println("Database connected successfully")
+	log.Println("Redis connected successfully")
 }
 
 func connect() {
-	dbDir := "./data"
-	dbPath := filepath.Join(dbDir, "payments.db")
-
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		log.Panicf("failed to create db directory: %v", err)
+	addr := config.GetEnv("STORAGE_URL", "localhost:6379")
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: "",
+		DB:       0,
+	})
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Panicf("failed to connect to Redis: %v", err)
 	}
+}
 
-	var err error
-	db, err = sql.Open(
-		"sqlite3",
-		fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000", dbPath),
-	)
+func insertPayment(set string, req *entity.PaymentRequest) {
+	b, err := json.Marshal(req)
 	if err != nil {
-		log.Panicf("failed to open db: %v", err)
+		log.Printf("insertPayment marshal error: %v", err)
+		return
 	}
-
-	if _, err := db.Exec(`PRAGMA journal_mode=WAL;`); err != nil {
-		log.Panicf("failed to set WAL mode: %v", err)
-	}
-}
-
-func createTableIfNotExists(table string) {
-	query := fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			correlationid TEXT,
-			amount REAL,
-			requestedat DATETIME
-		)`, table)
-	if _, err := db.Exec(query); err != nil {
-		log.Panicf("failed to create %s: %v", table, err)
+	score := float64(req.RequestedAt.Unix())
+	if err := rdb.ZAdd(ctx, set, redis.Z{Score: score, Member: b}).Err(); err != nil {
+		log.Printf("insertPayment(%s) error: %v", set, err)
 	}
 }
 
-func insertPayment(table string, req *entity.PaymentRequest) {
-	query := fmt.Sprintf(
-		"INSERT INTO %s(correlationid, amount, requestedat) VALUES (?, ?, ?)",
-		table,
-	)
-	_, err := db.Exec(query, req.CorrelationId, req.Amount, req.RequestedAt)
+func totalByPeriod(set string, from, to time.Time) (int, float64) {
+	fromScore := float64(from.Unix())
+	toScore := float64(to.Unix())
+
+	vals, err := rdb.ZRangeByScore(ctx, set, &redis.ZRangeBy{
+		Min: formatFloat(fromScore),
+		Max: formatFloat(toScore),
+	}).Result()
 	if err != nil {
-		log.Printf("insertPayment(%s) error: %v", table, err)
-	}
-}
-
-func totalByPeriod(table string, from, to time.Time) (int, float64) {
-	query := fmt.Sprintf(`
-        SELECT COUNT(*), COALESCE(SUM(amount), 0)
-        FROM %s
-        WHERE requestedat BETWEEN ? AND ?
-    `, table)
-	row := db.QueryRow(query, from, to)
-	var count int
-	var total float64
-	if err := row.Scan(&count, &total); err != nil {
-		log.Printf("totalByPeriod(%s) error: %v", table, err)
+		log.Printf("totalByPeriod(%s) error: %v", set, err)
 		return 0, 0
 	}
+
+	count := 0
+	total := 0.0
+	for _, v := range vals {
+		var req entity.PaymentRequest
+		if err := json.Unmarshal([]byte(v), &req); err != nil {
+			continue
+		}
+		count++
+		total += req.Amount
+	}
 	return count, total
+}
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
 func InsertDefault(req *entity.PaymentRequest) {
@@ -100,13 +94,12 @@ func TotalByPeriodFallback(from, to time.Time) (int, float64) {
 
 func PurgeAllData() error {
 	tables := []string{"paymentsDefault", "paymentsFallback"}
-	for _, table := range tables {
-		query := fmt.Sprintf("DELETE FROM %s", table)
-		if _, err := db.Exec(query); err != nil {
-			log.Printf("failed to purge table %s: %v", table, err)
+	for _, set := range tables {
+		if err := rdb.Del(ctx, set).Err(); err != nil {
+			log.Printf("failed to purge set %s: %v", set, err)
 			return err
 		}
 	}
-	log.Println("All payment tables purged successfully")
+	log.Println("All payment sets purged successfully")
 	return nil
 }

@@ -18,6 +18,7 @@ func HandlePostPayments(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
+	entity.SetRequestedAt(payment)
 	go broker.Publish(payment)
 }
 

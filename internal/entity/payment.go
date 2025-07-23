@@ -7,9 +7,9 @@ import (
 )
 
 type PaymentRequest struct {
-	CorrelationId string    `json:"correlationid"`
+	CorrelationId string    `json:"correlationId"`
 	Amount        float64   `json:"amount"`
-	RequestedAt   time.Time `json:"requestedat"`
+	RequestedAt   time.Time `json:"requestedAt"`
 }
 
 var (

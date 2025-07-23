@@ -1,12 +1,12 @@
 x-app-base: &app-base
   build:
-    context: .
+    context: /home/willian/github/rinha
     dockerfile: Dockerfile
   environment:
     - DEFAULT_URL=http://payment-processor-default:8080
     - FALLBACK_URL=http://payment-processor-fallback:8080
     - MAX_WORKERS=5
-    - MAX_ACK_PENDING=10
+    - STORAGE_URL=redis:6379
     - BROKER_URL=nats://nats:4222
   networks:
     - backend
@@ -20,6 +20,26 @@ x-app-base: &app-base
         memory: "120MB"
 
 services:
+  redis:
+    image: redis:7-alpine
+    command:
+      [
+        "redis-server",
+        "--maxmemory", "35mb",
+        "--maxmemory-policy", "allkeys-lru",
+        "--save", ""
+      ]
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: "40MB"
   nats:
     image: nats:2.10-alpine
     command: ["-js"]
@@ -39,12 +59,14 @@ services:
     <<: *app-base
     hostname: api1
     depends_on:
+      - redis
       - nats
 
   app2:
     <<: *app-base
     hostname: api2
     depends_on:
+      - redis
       - nats
 
   nginx:
@@ -72,4 +94,5 @@ networks:
 
 volumes:
   rinha-store:
+  redis-data:
   nats-data:
